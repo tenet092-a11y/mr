@@ -13,7 +13,10 @@ from unittest.mock import Mock, patch, MagicMock
 
 # Mock heavy dependencies for testing
 import sys
-sys.modules['torch'] = Mock()
+torch_mock = Mock()
+torch_mock.cuda = Mock()
+torch_mock.cuda.is_available = Mock(return_value=False)
+sys.modules['torch'] = torch_mock
 sys.modules['clip'] = Mock()
 sys.modules['cv2'] = Mock()
 sys.modules['pytesseract'] = Mock()
