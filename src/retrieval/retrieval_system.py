@@ -15,7 +15,7 @@ from ..models import (
     DocumentContent, ProcessingResult, GroundedResponse, Citation
 )
 from ..config import SystemConfig
-from ..processors.router import DocumentRouter
+from ..processors.simple_router import SimpleDocumentRouter
 from ..embeddings.unified_embedding_generator import UnifiedEmbeddingGenerator
 from .vectordb import QdrantVectorStore
 from ..llm.ollama_client import OllamaClient
@@ -49,7 +49,7 @@ class MultimodalRetrievalSystem:
         self.config = config
         
         # Initialize components
-        self.document_router = DocumentRouter(config.processing)
+        self.document_router = SimpleDocumentRouter(config.processing)
         self.embedding_generator = UnifiedEmbeddingGenerator(config.embedding)
         self.vector_store = QdrantVectorStore(config.storage, config.embedding)
         

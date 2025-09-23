@@ -8,7 +8,6 @@ processors while providing comprehensive file validation.
 import mimetypes
 from pathlib import Path
 from typing import Dict, List, Optional, Type
-import magic
 
 from .base import DocumentProcessor, UnsupportedFormatError, FileValidationError
 from ..models import ValidationResult, ContentType
@@ -27,13 +26,7 @@ class DocumentRouter:
         self.config = config
         self._processors: Dict[str, Type[DocumentProcessor]] = {}
         self._format_mappings = self._build_format_mappings()
-        
-        # Initialize python-magic for MIME type detection
-        try:
-            self._magic = magic.Magic(mime=True)
-        except Exception:
-            # Fallback if python-magic is not available
-            self._magic = None
+        self._magic = None  # Disable python-magic to avoid libmagic dependency
     
     def register_processor(self, processor_class: Type[DocumentProcessor], formats: List[str]) -> None:
         """

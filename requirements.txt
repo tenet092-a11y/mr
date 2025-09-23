@@ -7,10 +7,6 @@ PyPDF2
 python-docx
 Pillow
 
-# OCR and image processing
-pytesseract
-opencv-python
-
 # Audio processing
 openai-whisper
 librosa
@@ -25,7 +21,7 @@ transformers
 clip-by-openai
 
 # Vector indexing
-faiss-cpu
+qdrant-client
 
 # LLM integration
 requests
@@ -40,6 +36,10 @@ pydantic
 # sqlite3 is built-in with Python
 sqlalchemy
 
+# OCR and image processing (optional - may require system dependencies)
+# pytesseract
+# opencv-python
+
 # Utilities
 tqdm
 click
@@ -52,7 +52,3 @@ pytest-asyncio
 black
 flake8
 mypy
-
-# Optional GPU support (uncomment if using CUDA)
-# faiss-gpu
-# torch
