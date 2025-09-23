@@ -45,16 +45,31 @@ class EmbeddingConfig:
 @dataclass
 class LLMConfig:
     """Configuration for local LLM integration."""
-    model_path: str = "models/llama-2-7b-chat.Q4_K_M.gguf"
+    # Ollama configuration
+    ollama_base_url: str = "http://localhost:11434"
+    primary_model: str = "phi3:mini"
+    secondary_model: str = "llama3.2:3b"
+    fallback_enabled: bool = True
+    
+    # Generation parameters
     max_context_length: int = 4096
     max_response_length: int = 512
     temperature: float = 0.7
     top_p: float = 0.9
     top_k: int = 40
-    quantization: str = "4bit"
-    device: str = "auto"
-    n_threads: int = -1  # -1 for auto
-    context_window_strategy: str = "sliding"  # sliding, truncate
+    
+    # Citation configuration
+    enable_citations: bool = True
+    min_citation_confidence: float = 0.3
+    citation_style: str = "numbered"  # numbered, author_year, footnote
+    include_page_numbers: bool = True
+    include_timestamps: bool = True
+    max_excerpt_length: int = 150
+    
+    # Response quality
+    validate_citations: bool = True
+    include_confidence_scores: bool = True
+    
     citation_prompt_template: str = """Based on the following context, answer the question and include numbered citations [1], [2], etc. for each source used.
 
 Context:

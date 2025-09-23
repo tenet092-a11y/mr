@@ -28,7 +28,8 @@ clip-by-openai
 faiss-cpu
 
 # LLM integration
-llama-cpp-python
+requests
+ollama  # Optional: for easier Ollama integration
 
 # API framework
 fastapi

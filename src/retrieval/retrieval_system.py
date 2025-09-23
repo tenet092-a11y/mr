@@ -18,6 +18,10 @@ from ..config import SystemConfig
 from ..processors.router import DocumentRouter
 from ..embeddings.unified_embedding_generator import UnifiedEmbeddingGenerator
 from .vectordb import QdrantVectorStore
+from ..llm.ollama_client import OllamaClient
+from ..llm.hybrid_llm_manager import HybridLLMManager
+from ..llm.citation_generator import CitationGenerator, CitationStyle
+from ..llm.response_generator import ResponseGenerator, ResponseConfig
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +52,29 @@ class MultimodalRetrievalSystem:
         self.document_router = DocumentRouter(config.processing)
         self.embedding_generator = UnifiedEmbeddingGenerator(config.embedding)
         self.vector_store = QdrantVectorStore(config.storage, config.embedding)
+        
+        # Initialize LLM components
+        self.ollama_client = OllamaClient(
+            base_url=config.llm.ollama_base_url,
+            timeout=300
+        )
+        self.llm_manager = HybridLLMManager(self.ollama_client)
+        
+        # Initialize citation generator
+        citation_style = CitationStyle(
+            format_type=config.llm.citation_style,
+            include_page_numbers=config.llm.include_page_numbers,
+            include_timestamps=config.llm.include_timestamps,
+            max_excerpt_length=config.llm.max_excerpt_length,
+            show_content_type=True
+        )
+        self.citation_generator = CitationGenerator(citation_style)
+        
+        # Initialize response generator
+        self.response_generator = ResponseGenerator(
+            llm_manager=self.llm_manager,
+            citation_generator=self.citation_generator
+        )
         
         # Load embedding model
         self.embedding_generator.load_model()
@@ -208,67 +235,98 @@ class MultimodalRetrievalSystem:
         query: str, 
         context_results: List[RetrievalResult],
         max_length: int = 500,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        enable_citations: bool = True
     ) -> GroundedResponse:
         """
-        Generate a grounded response with citations.
+        Generate a grounded response with citations using hybrid LLM models.
         
         Args:
             query: User query
             context_results: Retrieved context for response generation
             max_length: Maximum response length
             temperature: LLM temperature
+            enable_citations: Whether to generate citations
             
         Returns:
             GroundedResponse with citations
         """
         try:
-            # For now, create a simple response with citations
-            # In a full implementation, this would use an LLM
+            # Check if Ollama is available
+            if not self.ollama_client.is_available():
+                logger.warning("Ollama server not available, using fallback response")
+                return self._generate_fallback_response(query, context_results)
             
-            if not context_results:
-                return GroundedResponse(
-                    response_text="I couldn't find relevant information to answer your question.",
-                    citations=[],
-                    confidence_score=0.0,
-                    retrieval_results=[],
-                    query=query
-                )
-            
-            # Create citations from retrieval results
-            citations = []
-            for i, result in enumerate(context_results[:5]):  # Limit to top 5
-                citation = Citation(
-                    citation_id=i + 1,
-                    source_file=result.source_location.file_path,
-                    location=result.source_location,
-                    excerpt=result.content[:200] + "..." if len(result.content) > 200 else result.content,
-                    relevance_score=result.relevance_score,
-                    content_type=result.content_type
-                )
-                citations.append(citation)
-            
-            # Generate simple response (placeholder for LLM integration)
-            response_text = self._generate_simple_response(query, context_results)
-            
-            confidence_score = min(1.0, sum(r.relevance_score for r in context_results[:3]) / 3)
-            
-            return GroundedResponse(
-                response_text=response_text,
-                citations=citations,
-                confidence_score=confidence_score,
-                retrieval_results=context_results,
-                query=query,
-                generation_metadata={
-                    "model": "simple_retrieval",
-                    "temperature": temperature,
-                    "max_length": max_length
-                }
+            # Configure response generation
+            response_config = ResponseConfig(
+                max_length=max_length,
+                temperature=temperature,
+                enable_citations=enable_citations,
+                min_citation_confidence=self.config.llm.min_citation_confidence,
+                validate_citations=self.config.llm.validate_citations,
+                include_confidence_scores=self.config.llm.include_confidence_scores
             )
+            
+            # Generate response using hybrid LLM system
+            grounded_response = self.response_generator.generate_response(
+                query=query,
+                context_results=context_results,
+                config=response_config
+            )
+            
+            return grounded_response
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-            raise
+            # Return fallback response on error
+            return self._generate_fallback_response(query, context_results)
+    
+    def _generate_fallback_response(
+        self, 
+        query: str, 
+        context_results: List[RetrievalResult]
+    ) -> GroundedResponse:
+        """Generate fallback response when LLM is unavailable."""
+        if not context_results:
+            return GroundedResponse(
+                response_text="I couldn't find relevant information to answer your question.",
+                citations=[],
+                confidence_score=0.0,
+                retrieval_results=[],
+                query=query,
+                generation_metadata={"fallback": True, "reason": "no_context"}
+            )
+        
+        # Create citations from retrieval results
+        citations = []
+        for i, result in enumerate(context_results[:5]):  # Limit to top 5
+            citation = Citation(
+                citation_id=i + 1,
+                source_file=result.source_location.file_path,
+                location=result.source_location,
+                excerpt=result.content[:200] + "..." if len(result.content) > 200 else result.content,
+                relevance_score=result.relevance_score,
+                content_type=result.content_type
+            )
+            citations.append(citation)
+        
+        # Generate simple response
+        response_text = self._generate_simple_response(query, context_results)
+        
+        confidence_score = min(1.0, sum(r.relevance_score for r in context_results[:3]) / 3)
+        
+        return GroundedResponse(
+            response_text=response_text,
+            citations=citations,
+            confidence_score=confidence_score,
+            retrieval_results=context_results,
+            query=query,
+            generation_metadata={
+                "fallback": True,
+                "reason": "llm_unavailable",
+                "model": "simple_retrieval"
+            }
+        )
     
     def _generate_simple_response(self, query: str, results: List[RetrievalResult]) -> str:
         """Generate a simple response based on retrieved results."""
@@ -357,15 +415,34 @@ class MultimodalRetrievalSystem:
             vector_stats = self.vector_store.get_statistics()
             embedding_stats = self.embedding_generator.get_embedding_stats()
             
+            # Get LLM statistics if available
+            llm_stats = {}
+            try:
+                if self.ollama_client.is_available():
+                    llm_stats = {
+                        'ollama_available': True,
+                        'generation_stats': self.ollama_client.get_generation_stats(),
+                        'model_status': self.llm_manager.get_model_status(),
+                        'response_stats': self.response_generator.get_generation_statistics()
+                    }
+                else:
+                    llm_stats = {'ollama_available': False}
+            except Exception as e:
+                llm_stats = {'ollama_available': False, 'error': str(e)}
+            
             return {
                 "vector_store": vector_stats,
                 "embedding_generator": embedding_stats,
+                "llm_system": llm_stats,
                 "supported_formats": self.document_router.get_supported_formats(),
                 "configuration": {
                     "chunk_size": self.config.processing.chunk_size,
                     "embedding_dimension": self.config.embedding.embedding_dimension,
                     "text_model": self.config.embedding.text_model_name,
-                    "image_model": self.config.embedding.image_model_name
+                    "image_model": self.config.embedding.image_model_name,
+                    "primary_llm": self.config.llm.primary_model,
+                    "secondary_llm": self.config.llm.secondary_model,
+                    "citations_enabled": self.config.llm.enable_citations
                 }
             }
             
