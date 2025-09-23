@@ -18,6 +18,10 @@ from ..config import SystemConfig
 from ..processors.simple_router import SimpleDocumentRouter
 from ..embeddings.unified_embedding_generator import UnifiedEmbeddingGenerator
 from .vectordb import QdrantVectorStore
+from ..processors.pdf_processor import PDFProcessor
+from ..processors.docx_processor import DOCXProcessor
+from ..processors.image_processor import ImageProcessor
+from ..processors.audio_processor import AudioProcessor
 from ..llm.ollama_client import OllamaClient
 from ..llm.hybrid_llm_manager import HybridLLMManager
 from ..llm.citation_generator import CitationGenerator, CitationStyle
@@ -51,6 +55,13 @@ class MultimodalRetrievalSystem:
         # Initialize components
         self.document_router = SimpleDocumentRouter(config.processing)
         self.embedding_generator = UnifiedEmbeddingGenerator(config.embedding)
+        
+        # Register document processors
+        self.document_router.register_processor(PDFProcessor, ['pdf'])
+        self.document_router.register_processor(DOCXProcessor, ['docx'])
+        self.document_router.register_processor(ImageProcessor, ['png', 'jpg', 'jpeg', 'bmp', 'tiff', 'webp'])
+        self.document_router.register_processor(AudioProcessor, ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'wma', 'aac'])
+        
         self.vector_store = QdrantVectorStore(config.storage, config.embedding)
         
         # Initialize LLM components
