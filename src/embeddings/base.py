@@ -230,7 +230,7 @@ class MultimodalEmbeddingGenerator(EmbeddingGenerator):
     
     def get_supported_content_types(self) -> List[ContentType]:
         """Multimodal generator supports all content types."""
-        return [ContentType.TEXT, ContentType.IMAGE, ContentType.AUDIO]
+        return [ContentType.TEXT, ContentType.PDF, ContentType.DOCX, ContentType.IMAGE, ContentType.AUDIO]
 
 
 class EmbeddingCache:

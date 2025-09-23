@@ -371,6 +371,8 @@ class UnifiedEmbeddingGenerator(MultimodalEmbeddingGenerator):
         """
         if content_type == ContentType.TEXT:
             return self.encode_text(content)
+        elif content_type == ContentType.PDF:
+            return self.encode_text(content)  # Treat PDF as text content
         elif content_type == ContentType.IMAGE:
             return self.encode_image(content)
         elif content_type == ContentType.AUDIO:
@@ -412,6 +414,8 @@ class UnifiedEmbeddingGenerator(MultimodalEmbeddingGenerator):
         for i, content_type in enumerate(content_types):
             if content_type == ContentType.TEXT:
                 text_indices.append(i)
+            elif content_type == ContentType.PDF:
+                text_indices.append(i)  # Treat PDF as text content
             elif content_type == ContentType.IMAGE:
                 image_indices.append(i)
             elif content_type == ContentType.AUDIO:
@@ -666,7 +670,7 @@ class UnifiedEmbeddingGenerator(MultimodalEmbeddingGenerator):
     
     def get_supported_content_types(self) -> List[ContentType]:
         """Get list of supported content types."""
-        return [ContentType.TEXT, ContentType.IMAGE, ContentType.AUDIO]
+        return [ContentType.TEXT, ContentType.PDF, ContentType.DOCX, ContentType.IMAGE, ContentType.AUDIO]
     
     def get_embedding_stats(self) -> Dict[str, Any]:
         """

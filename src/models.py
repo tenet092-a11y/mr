@@ -19,6 +19,7 @@ class ContentType(Enum):
     AUDIO = "audio"
     PDF = "pdf"
     DOCX = "docx"
+    VIDEO = "video"
 
 
 @dataclass
